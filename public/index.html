@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <meta name="color-scheme" content="dark">
+  <title>Clinic HUD</title>
+  <link rel="stylesheet" href="/css/app.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%230e7490'/><path d='M14 7h4v7h7v4h-7v7h-4v-7H7v-4h7z' fill='white'/></svg>">
+</head>
+<body>
+
+<!-- Emergency banner. Hidden until a code is active. -->
+<div id="emergency-banner" class="emergency-banner" hidden role="alert" aria-live="assertive">
+  <span class="emergency-banner__pulse" aria-hidden="true"></span>
+  <div class="emergency-banner__text">
+    <strong id="emergency-title">CODE</strong>
+    <span id="emergency-detail"></span>
+  </div>
+  <button type="button" class="btn btn--sm btn--ghost" id="emergency-ack">Acknowledge</button>
+</div>
+
+<!-- ===================== Login ===================== -->
+<div id="login-screen" class="login" hidden>
+  <form class="login__card" id="login-form" autocomplete="on">
+    <div class="login__brand">
+      <div class="login__mark" aria-hidden="true">
+        <svg viewBox="0 0 32 32" width="34" height="34"><path d="M14 6h4v8h8v4h-8v8h-4v-8H6v-4h8z" fill="currentColor"/></svg>
+      </div>
+      <div>
+        <h1 class="login__name" id="login-clinic-name">Clinic HUD</h1>
+        <p class="login__tagline" id="login-tagline">Electronic Health Record</p>
+      </div>
+    </div>
+
+    <div id="login-error" class="alert alert--error" hidden></div>
+
+    <label class="field">
+      <span class="field__label">Username</span>
+      <input class="input" type="text" name="username" id="login-username"
+             autocomplete="username" required autocapitalize="none" spellcheck="false">
+    </label>
+
+    <label class="field">
+      <span class="field__label">Password</span>
+      <input class="input" type="password" name="password" id="login-password"
+             autocomplete="current-password" required>
+    </label>
+
+    <button class="btn btn--primary btn--block" type="submit" id="login-submit">Sign in</button>
+
+    <p class="login__note">Authorised clinic staff only. All activity is logged.</p>
+  </form>
+</div>
+
+<!-- ===================== Application ===================== -->
+<div id="app" class="app" hidden>
+
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar__brand">
+      <div class="sidebar__mark" aria-hidden="true">
+        <svg viewBox="0 0 32 32" width="22" height="22"><path d="M14 6h4v8h8v4h-8v8h-4v-8H6v-4h8z" fill="currentColor"/></svg>
+      </div>
+      <div class="sidebar__brand-text">
+        <span class="sidebar__name" id="sidebar-clinic-name">Clinic</span>
+        <span class="sidebar__sub" id="sidebar-clock">--:--</span>
+      </div>
+      <button type="button" class="sidebar__close" id="sidebar-close" aria-label="Close menu">&times;</button>
+    </div>
+
+    <nav class="nav" id="nav"><!-- built by app.js --></nav>
+
+    <div class="sidebar__footer">
+      <div class="who">
+        <span class="who__avatar" id="who-initials">--</span>
+        <span class="who__text">
+          <span class="who__name" id="who-name">-</span>
+          <span class="who__role" id="who-role">-</span>
+        </span>
+      </div>
+      <label class="duty">
+        <input type="checkbox" id="duty-toggle">
+        <span class="duty__track"><span class="duty__thumb"></span></span>
+        <span class="duty__label">On duty</span>
+      </label>
+      <button class="btn btn--sm btn--ghost btn--block" id="logout-btn" type="button">Sign out</button>
+    </div>
+  </aside>
+
+  <div class="sidebar-scrim" id="sidebar-scrim" hidden></div>
+
+  <div class="main">
+    <header class="topbar">
+      <button type="button" class="iconbtn topbar__menu" id="menu-btn" aria-label="Menu">
+        <svg viewBox="0 0 24 24" width="20" height="20"><path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/></svg>
+      </button>
+
+      <div class="topbar__title">
+        <h1 id="page-title">Dashboard</h1>
+        <p id="page-subtitle" class="topbar__sub"></p>
+      </div>
+
+      <div class="topbar__actions">
+        <button type="button" class="btn btn--danger btn--sm" id="emergency-btn" title="Raise an emergency code">
+          <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path d="M12 3l9 16H3z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M12 9v5M12 16.5v.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+          <span class="hide-sm">Emergency</span>
+        </button>
+
+        <button type="button" class="iconbtn" id="notif-btn" aria-label="Notifications">
+          <svg viewBox="0 0 24 24" width="19" height="19"><path d="M18 15v-4a6 6 0 10-12 0v4l-2 3h16zM10 21h4" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+          <span class="badge badge--dot" id="notif-count" hidden>0</span>
+        </button>
+
+        <span class="conn" id="conn-indicator" title="Live connection">
+          <span class="conn__dot"></span>
+        </span>
+      </div>
+    </header>
+
+    <main class="content" id="view" tabindex="-1">
+      <div class="loading"><span class="spinner"></span> Loading…</div>
+    </main>
+  </div>
+
+  <!-- Notification drawer -->
+  <div class="drawer" id="notif-drawer" hidden>
+    <div class="drawer__head">
+      <h2>Notifications</h2>
+      <div class="drawer__head-actions">
+        <button type="button" class="btn btn--sm btn--ghost" id="notif-read-all">Mark all read</button>
+        <button type="button" class="iconbtn" id="notif-close" aria-label="Close">&times;</button>
+      </div>
+    </div>
+    <div class="drawer__body" id="notif-list"></div>
+  </div>
+  <div class="drawer-scrim" id="drawer-scrim" hidden></div>
+</div>
+
+<!-- Toast stack -->
+<div class="toasts" id="toasts" aria-live="polite"></div>
+
+<!-- Modal host -->
+<div class="modal" id="modal" hidden>
+  <div class="modal__scrim" data-modal-close></div>
+  <div class="modal__panel" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+    <header class="modal__head">
+      <h2 id="modal-title">Dialog</h2>
+      <button type="button" class="iconbtn" data-modal-close aria-label="Close">&times;</button>
+    </header>
+    <div class="modal__body" id="modal-body"></div>
+    <footer class="modal__foot" id="modal-foot"></footer>
+  </div>
+</div>
+
+<!-- Emergency alert sound. Generated at runtime by ui.js via WebAudio, so no
+     external asset is needed and the CSP stays tight. -->
+
+<script type="module" src="/js/app.js"></script>
+</body>
+</html>
