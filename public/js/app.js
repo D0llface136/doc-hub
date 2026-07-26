@@ -90,7 +90,25 @@ const ICONS = {
 
 const els = {};
 
+function hideStartupFallback() {
+  const fallback = document.getElementById('startup-fallback');
+  if (fallback) fallback.hidden = true;
+}
+
+function showStartupFallback(message) {
+  const fallback = document.getElementById('startup-fallback');
+  const text = document.getElementById('startup-fallback-message');
+  if (fallback) fallback.hidden = false;
+  if (text) text.textContent = message || 'The app could not start. Please refresh the page.';
+
+  const login = document.getElementById('login-screen');
+  const app = document.getElementById('app');
+  if (login) login.hidden = true;
+  if (app) app.hidden = true;
+}
+
 async function boot() {
+  hideStartupFallback();
   cacheElements();
   wireChrome();
 
@@ -151,11 +169,13 @@ async function loadPublicSettings() {
 // --- Authentication --------------------------------------------------------
 
 function showLogin() {
-  els.login.hidden = false;
-  els.app.hidden = true;
+  hideStartupFallback();
+  if (els.login) els.login.hidden = false;
+  if (els.app) els.app.hidden = true;
   document.body.classList.remove('has-emergency');
-  els.banner.hidden = true;
-  $('#login-username').focus();
+  if (els.banner) els.banner.hidden = true;
+  const username = $('#login-username');
+  if (username) username.focus();
 }
 
 async function startSession(staff) {
@@ -399,14 +419,21 @@ window.addEventListener('hashchange', handleRoute);
 // --- Chrome wiring ---------------------------------------------------------
 
 function wireChrome() {
-  $('#menu-btn').addEventListener('click', () => {
-    els.sidebar.classList.add('is-open');
-    els.scrim.hidden = false;
-  });
-  $('#sidebar-close').addEventListener('click', closeSidebar);
-  els.scrim.addEventListener('click', closeSidebar);
+  const menuBtn = $('#menu-btn');
+  if (menuBtn) {
+    menuBtn.addEventListener('click', () => {
+      if (els.sidebar) els.sidebar.classList.add('is-open');
+      if (els.scrim) els.scrim.hidden = false;
+    });
+  }
 
-  $('#logout-btn').addEventListener('click', async () => {
+  const sidebarClose = $('#sidebar-close');
+  if (sidebarClose) sidebarClose.addEventListener('click', closeSidebar);
+  if (els.scrim) els.scrim.addEventListener('click', closeSidebar);
+
+  const logoutBtn = $('#logout-btn');
+  if (logoutBtn) {
+    logoutBtn.addEventListener('click', async () => {
     const confirmed = await confirmDialog({
       title: 'Sign out',
       message: 'End this session? You will be marked off duty.',
@@ -414,11 +441,14 @@ function wireChrome() {
     });
     if (!confirmed) return;
 
-    try { await api.logout(); } catch { /* sign out locally regardless */ }
-    signOutLocal();
-  });
+      try { await api.logout(); } catch { /* sign out locally regardless */ }
+      signOutLocal();
+    });
+  }
 
-  $('#duty-toggle').addEventListener('change', async (e) => {
+  const dutyToggle = $('#duty-toggle');
+  if (dutyToggle) {
+    dutyToggle.addEventListener('change', async (e) => {
     try {
       await api.post('/auth/duty', { on_duty: e.target.checked });
       toastOk(e.target.checked ? 'You are on duty.' : 'You are off duty.');
@@ -427,16 +457,24 @@ function wireChrome() {
       reportError(err);
     }
   });
+  }
 
-  $('#notif-btn').addEventListener('click', () => {
+  const notifBtn = $('#notif-btn');
+  if (notifBtn) {
+    notifBtn.addEventListener('click', () => {
     els.notifDrawer.hidden = !els.notifDrawer.hidden;
     els.drawerScrim.hidden = els.notifDrawer.hidden;
-    if (!els.notifDrawer.hidden) refreshNotifications();
-  });
-  $('#notif-close').addEventListener('click', closeDrawer);
-  els.drawerScrim.addEventListener('click', closeDrawer);
+      if (!els.notifDrawer.hidden) refreshNotifications();
+    });
+  }
 
-  $('#notif-read-all').addEventListener('click', async () => {
+  const notifClose = $('#notif-close');
+  if (notifClose) notifClose.addEventListener('click', closeDrawer);
+  if (els.drawerScrim) els.drawerScrim.addEventListener('click', closeDrawer);
+
+  const notifReadAll = $('#notif-read-all');
+  if (notifReadAll) {
+    notifReadAll.addEventListener('click', async () => {
     try {
       await api.post('/notifications/read-all');
       await refreshNotifications();
@@ -445,9 +483,12 @@ function wireChrome() {
       reportError(err);
     }
   });
+  }
 
-  $('#emergency-btn').addEventListener('click', openEmergencyDialog);
-  $('#emergency-ack').addEventListener('click', acknowledgeTopEmergency);
+  const emergencyBtn = $('#emergency-btn');
+  if (emergencyBtn) emergencyBtn.addEventListener('click', openEmergencyDialog);
+  const emergencyAck = $('#emergency-ack');
+  if (emergencyAck) emergencyAck.addEventListener('click', acknowledgeTopEmergency);
 
   // Modal scrim / close buttons.
   document.addEventListener('click', (e) => {
@@ -463,9 +504,11 @@ function wireChrome() {
   });
 
   subscribe('connected', (isConnected) => {
-    els.conn.classList.toggle('is-live', isConnected);
-    els.conn.classList.toggle('is-down', !isConnected);
-    els.conn.title = isConnected ? 'Live updates connected' : 'Live updates offline';
+    if (els.conn) {
+      els.conn.classList.toggle('is-live', isConnected);
+      els.conn.classList.toggle('is-down', !isConnected);
+      els.conn.title = isConnected ? 'Live updates connected' : 'Live updates offline';
+    }
   });
 }
 
@@ -685,12 +728,7 @@ function wireRealtime() {
 
 boot().catch((err) => {
   console.error('[boot]', err);
-  document.body.innerHTML = html`
-    <div style="padding:40px;text-align:center;color:#e6edf5;font-family:sans-serif">
-      <h1>Could not start</h1>
-      <p>${err.message ?? 'Unknown error'}</p>
-      <button onclick="location.reload()" style="padding:8px 16px;margin-top:12px">Reload</button>
-    </div>`;
+  showStartupFallback(err?.message ?? 'The app could not start. Please refresh the page.');
 });
 
 // Views import these rather than reaching for globals.

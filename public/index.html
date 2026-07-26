@@ -21,7 +21,7 @@
 </div>
 
 <!-- ===================== Login ===================== -->
-<div id="login-screen" class="login" hidden>
+<div id="login-screen" class="login">
   <form class="login__card" id="login-form" autocomplete="on">
     <div class="login__brand">
       <div class="login__mark" aria-hidden="true">
@@ -154,6 +154,39 @@
 
 <!-- Emergency alert sound. Generated at runtime by ui.js via WebAudio, so no
      external asset is needed and the CSP stays tight. -->
+
+<div id="startup-fallback" class="startup-fallback" hidden style="position:fixed;inset:0;z-index:9999;background:linear-gradient(135deg,#07111f,#10253c);display:flex;align-items:center;justify-content:center;padding:24px;">
+  <div style="max-width:420px;width:100%;padding:24px;border-radius:18px;background:rgba(7,15,28,.92);border:1px solid rgba(255,255,255,.12);box-shadow:0 16px 45px rgba(0,0,0,.35);color:#f2f7ff;text-align:center;">
+    <h1 style="margin:0 0 10px;font-size:1.4rem;">Starting Clinic HUD…</h1>
+    <p id="startup-fallback-message" style="margin:0;line-height:1.5;color:#a9b8cc;">If this message stays visible, the browser could not load the application scripts. Please refresh the page.</p>
+  </div>
+</div>
+
+<script>
+  (function () {
+    const fallback = document.getElementById('startup-fallback');
+    const message = document.getElementById('startup-fallback-message');
+    function showStartupIssue(reason) {
+      if (!fallback) return;
+      fallback.hidden = false;
+      if (message) {
+        message.textContent = reason || 'The app could not start. Please refresh the page.';
+      }
+      const login = document.getElementById('login-screen');
+      const app = document.getElementById('app');
+      if (login) login.hidden = true;
+      if (app) app.hidden = true;
+    }
+
+    window.addEventListener('error', (event) => {
+      if (event?.error || event?.message) showStartupIssue(event.message || 'The app could not start.');
+    });
+    window.addEventListener('unhandledrejection', (event) => {
+      const reason = event?.reason?.message || event?.reason || 'The app could not start.';
+      showStartupIssue(reason);
+    });
+  })();
+</script>
 
 <script type="module" src="/js/app.js"></script>
 </body>
