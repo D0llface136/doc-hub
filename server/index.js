@@ -17,6 +17,9 @@ import { config, assertConfigValid } from './config/env.js';
 import { checkConnection, closePool, query } from './db/pool.js';
 import { validateDefaultRoles } from './lib/permissions.js';
 import bcrypt from 'bcryptjs';
+import { readFile } from 'node:fs/promises';
+import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
 import { connectionStats } from './lib/events.js';
 import { errorHandler, apiNotFound } from './middleware/error-handler.js';
 
@@ -45,12 +48,23 @@ import lslRoutes from './routes/lsl.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const publicDir = join(here, '..', 'public');
+const migrationSqlPath = join(here, 'db', 'schema.sql');
 
 assertConfigValid();
 
 const roleProblems = validateDefaultRoles();
 if (roleProblems.length > 0) {
   throw new Error(`Permission catalogue is inconsistent:\n  - ${roleProblems.join('\n  - ')}`);
+}
+
+async function ensureSchema() {
+  try {
+    const sql = await readFile(migrationSqlPath, 'utf8');
+    await query(sql);
+    console.log('[server] schema is up to date');
+  } catch (err) {
+    console.warn('[server] could not apply schema migration:', err.message);
+  }
 }
 
 async function ensureSeedAccounts() {
@@ -250,6 +264,7 @@ const server = app.listen(config.port, async () => {
   try {
     const db = await checkConnection();
     console.log(`[server] database connected - ${db.version.split(',')[0]}`);
+    await ensureSchema();
     await ensureSeedAccounts();
   } catch (err) {
     console.error('[server] DATABASE UNREACHABLE:', err.message);
