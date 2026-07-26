@@ -18,8 +18,6 @@ import { checkConnection, closePool, query } from './db/pool.js';
 import { validateDefaultRoles } from './lib/permissions.js';
 import bcrypt from 'bcryptjs';
 import { readFile } from 'node:fs/promises';
-import { fileURLToPath } from 'node:url';
-import { dirname, join } from 'node:path';
 import { connectionStats } from './lib/events.js';
 import { errorHandler, apiNotFound } from './middleware/error-handler.js';
 
