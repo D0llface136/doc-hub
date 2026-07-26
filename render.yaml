@@ -1,0 +1,38 @@
+# Render Blueprint - https://render.com/docs/blueprint-spec
+#
+# Deploy with:  Render Dashboard -> New -> Blueprint -> point at this repo.
+# DATABASE_URL and the secrets below are marked sync:false, so Render will
+# prompt for them at deploy time instead of storing them in source control.
+services:
+  - type: web
+    name: moap-clinic-hud
+    runtime: node
+    plan: starter
+    region: oregon
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PGSSL_REJECT_UNAUTHORIZED
+        value: "false"
+      - key: PG_POOL_MAX
+        value: "10"
+      - key: JWT_EXPIRES_IN
+        value: 12h
+      - key: BCRYPT_ROUNDS
+        value: "12"
+      # Prompted on first deploy - paste the Supabase pooler URL here.
+      - key: DATABASE_URL
+        sync: false
+      # Prompted on first deploy - or use generateValue for a random secret.
+      - key: JWT_SECRET
+        generateValue: true
+      - key: LSL_API_KEY
+        generateValue: true
+      - key: PUBLIC_BASE_URL
+        sync: false
+      - key: CORS_ORIGINS
+        sync: false
