@@ -14,8 +14,9 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
 import { config, assertConfigValid } from './config/env.js';
-import { checkConnection, closePool } from './db/pool.js';
+import { checkConnection, closePool, query } from './db/pool.js';
 import { validateDefaultRoles } from './lib/permissions.js';
+import bcrypt from 'bcryptjs';
 import { connectionStats } from './lib/events.js';
 import { errorHandler, apiNotFound } from './middleware/error-handler.js';
 
@@ -50,6 +51,52 @@ assertConfigValid();
 const roleProblems = validateDefaultRoles();
 if (roleProblems.length > 0) {
   throw new Error(`Permission catalogue is inconsistent:\n  - ${roleProblems.join('\n  - ')}`);
+}
+
+async function ensureSeedAccounts() {
+  try {
+    const { rows: roles } = await query(`
+      SELECT id, code FROM staff_roles WHERE code IN ('administrator','doctor','nurse','pharmacist','lab_tech','radiology_tech','receptionist')
+    `);
+    const roleMap = new Map(roles.map((row) => [row.code, row.id]));
+    if (roleMap.size === 0) return;
+
+    const seededAccounts = [
+      ['admin', 'Alex Reyes', 'administrator', 'Administration', null],
+      ['dr.chen', 'Mei Chen', 'doctor', 'General Medicine', 'Dr.'],
+      ['dr.okafor', 'Daniel Okafor', 'doctor', 'Emergency Medicine', 'Dr.'],
+      ['nurse.patel', 'Priya Patel', 'nurse', 'Nursing', 'RN'],
+      ['nurse.diallo', 'Awa Diallo', 'nurse', 'Nursing', 'RN'],
+      ['pharm.silva', 'Rafael Silva', 'pharmacist', 'Pharmacy', 'PharmD'],
+      ['lab.novak', 'Ivan Novak', 'lab_tech', 'Laboratory', null],
+      ['rad.tanaka', 'Yuki Tanaka', 'radiology_tech', 'Radiology', null],
+      ['front.moreau', 'Claire Moreau', 'receptionist', 'Reception', null],
+    ];
+
+    const helperHash = await bcrypt.hash(config.seed.adminPassword, config.auth.bcryptRounds);
+    for (const [username, fullName, roleCode, department, title] of seededAccounts) {
+      const roleId = roleMap.get(roleCode);
+      if (!roleId) continue;
+
+      await query(
+        `INSERT INTO staff (username, password_hash, full_name, display_title, role_id, department, status, must_change_password)
+         VALUES ($1, $2, $3, $4, $5, $6, 'active', false)
+         ON CONFLICT (username) DO UPDATE
+           SET password_hash = EXCLUDED.password_hash,
+               full_name = EXCLUDED.full_name,
+               display_title = EXCLUDED.display_title,
+               role_id = EXCLUDED.role_id,
+               department = EXCLUDED.department,
+               status = EXCLUDED.status,
+               must_change_password = EXCLUDED.must_change_password`,
+        [username, helperHash, fullName, title, roleId, department]
+      );
+    }
+
+    console.log('[server] ensured seeded staff accounts exist');
+  } catch (err) {
+    console.warn('[server] could not ensure seeded staff accounts:', err.message);
+  }
 }
 
 const app = express();
@@ -198,11 +245,15 @@ app.use(errorHandler);
 
 // --- Boot -----------------------------------------------------------------
 
-const server = app.listen(config.port, () => {
+const server = app.listen(config.port, async () => {
   console.log(`[server] MOAP Clinic HUD listening on port ${config.port} (${config.env})`);
-  checkConnection()
-    .then((db) => console.log(`[server] database connected - ${db.version.split(',')[0]}`))
-    .catch((err) => console.error('[server] DATABASE UNREACHABLE:', err.message));
+  try {
+    const db = await checkConnection();
+    console.log(`[server] database connected - ${db.version.split(',')[0]}`);
+    await ensureSeedAccounts();
+  } catch (err) {
+    console.error('[server] DATABASE UNREACHABLE:', err.message);
+  }
 });
 
 // SSE connections hold the socket open; without a timeout the process would
