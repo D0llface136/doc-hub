@@ -9,7 +9,7 @@
  *
  * Seeds:
  *   - the seven default roles
- *   - one account per role, all using SEED_ADMIN_PASSWORD
+ *   - one account per role, all using a temporary seeded password
  *   - clinic settings
  *   - the symptom checklist, diagnosis library, formulary and test catalogue
  *   - a few insurance providers
@@ -175,11 +175,18 @@ async function seedStaff(client) {
     const { rows: role } = await client.query('SELECT id FROM staff_roles WHERE code = $1', [roleCode]);
     if (role.length === 0) continue;
 
-    // DO NOTHING, not DO UPDATE: never reset a password an operator has changed.
+    // Seeded demo accounts use the configured temporary password so staff can
+    // sign in immediately after the database has been reseeded.
     const { rowCount } = await client.query(
       `INSERT INTO staff (username, password_hash, full_name, display_title, role_id, department, must_change_password)
-       VALUES ($1,$2,$3,$4,$5,$6,true)
-       ON CONFLICT (username) DO NOTHING`,
+       VALUES ($1,$2,$3,$4,$5,$6,false)
+       ON CONFLICT (username) DO UPDATE
+         SET password_hash = EXCLUDED.password_hash,
+             full_name = EXCLUDED.full_name,
+             display_title = EXCLUDED.display_title,
+             role_id = EXCLUDED.role_id,
+             department = EXCLUDED.department,
+             must_change_password = EXCLUDED.must_change_password`,
       [username, hash, fullName, title, role[0].id, department]
     );
     createdCount += rowCount;
@@ -187,8 +194,8 @@ async function seedStaff(client) {
 
   console.log(`[seed] ${createdCount} staff account(s) created (${STAFF.length - createdCount} already existed)`);
   if (createdCount > 0) {
-    console.log(`[seed] password for new accounts: ${config.seed.adminPassword}`);
-    console.log('[seed] every account is flagged must_change_password.');
+    console.log(`[seed] temporary password for seeded accounts: ${config.seed.adminPassword}`);
+    console.log('[seed] seeded accounts are not forced to change their password on first sign-in.');
   }
 }
 

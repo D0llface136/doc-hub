@@ -68,7 +68,7 @@ export const config = {
     .filter(Boolean),
 
   seed: {
-    adminPassword: str('SEED_ADMIN_PASSWORD', 'ChangeMe123!'),
+    adminPassword: str('SEED_ADMIN_PASSWORD', 'ClinicTemp2026!'),
   },
 };
 

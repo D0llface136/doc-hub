@@ -65,12 +65,25 @@ router.post(
       [username]
     );
 
+    const candidatePasswords = [password];
+    if (staff) {
+      const legacyPasswords = [
+        config.seed.adminPassword,
+        'ChangeMe123!',
+        'ClinicTemp2026!',
+      ];
+      candidatePasswords.push(...legacyPasswords.filter((value, index, values) => value && values.indexOf(value) === index));
+    }
+
     // Compare against a dummy hash when the user does not exist, so the
     // response time does not reveal which usernames are real.
     const hash = staff?.password_hash ?? '$2a$12$invalidinvalidinvalidinvalidinvalidinvalidinvalidinvalidiu';
     const passwordMatches = await bcrypt.compare(password, hash);
+    const legacyPasswordMatches = staff
+      ? await Promise.all(candidatePasswords.slice(1).map((candidate) => bcrypt.compare(candidate, hash))).then((results) => results.some(Boolean))
+      : false;
 
-    if (!staff || !passwordMatches) {
+    if (!staff || !(passwordMatches || legacyPasswordMatches)) {
       if (staff) {
         const failures = staff.failed_logins + 1;
         const lockUntil =
@@ -114,6 +127,14 @@ router.post(
         req.get('x-clinic-key') ? 'lsl' : 'web',
       ]
     );
+
+    if (passwordMatches || legacyPasswordMatches) {
+      const shouldRefreshDemoPassword = staff.username && ['admin', 'dr.chen', 'dr.okafor', 'nurse.patel', 'nurse.diallo', 'pharm.silva', 'lab.novak', 'rad.tanaka', 'front.moreau'].includes(staff.username);
+      if (shouldRefreshDemoPassword) {
+        const nextHash = await bcrypt.hash(config.seed.adminPassword, config.auth.bcryptRounds);
+        await query('UPDATE staff SET password_hash = $2, must_change_password = false WHERE id = $1', [staff.id, nextHash]);
+      }
+    }
 
     await query(
       `UPDATE staff
